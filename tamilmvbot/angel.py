@@ -19,7 +19,7 @@ load_dotenv()
 # ============ WOODctaft =================
 TOKEN = os.getenv('TOKEN')
 WEBHOOK_URL = os.getenv('WEBHOOK_URL')
-TAMILMV_URL = os.getenv('TAMILMV_URL', '')
+TAMILMV_URL = os.getenv('TAMILMV_URL', 'https://www.1tamilmv.boo')
 PORT = int(os.getenv('PORT', 3000))
 # ========================================
 bot = telebot.TeleBot(TOKEN, parse_mode='HTML')
@@ -43,6 +43,7 @@ def random_answer(message):
 ⚙️ <b>How to use me??</b> 🤔
 
 ✯ Please enter /view command and you'll get magnet link as well as link to torrent file 😌
+✯ Use /getlink &lt;movie name&gt; to get a direct link to a movie.
 
 <blockquote><b>🔗 Share and Support 💝</b></blockquote>"""
 
@@ -82,6 +83,25 @@ def start(message):
     )
 
 
+@bot.message_handler(commands=['getlink'])
+def get_link(message):
+    try:
+        movie_name = message.text.split(' ', 1)[1]
+        bot.send_message(message.chat.id, f"Searching for {movie_name}...")
+        movie_details = search_movie(movie_name)
+        if movie_details:
+            for detail in movie_details:
+                bot.send_message(message.chat.id, text=detail)
+        else:
+            bot.send_message(
+                message.chat.id,
+                "Sorry, I couldn't find a torrent for that movie.")
+    except IndexError:
+        bot.send_message(
+            message.chat.id,
+            "Please provide a movie name. Usage: /getlink <movie name>")
+
+
 @bot.callback_query_handler(func=lambda call: True)
 def callback_query(call):
     global real_dict
@@ -118,11 +138,11 @@ def tamilmv():
 
         temps = soup.find_all('div', {'class': 'ipsType_break ipsContained'})
 
-        if len(temps) < 15:
-            logger.warning("Not enough movies found on the page")
+        if len(temps) < 1:
+            logger.warning("No movies found on the page")
             return [], {}
 
-        for i in range(15):
+        for i in range(min(30, len(temps))): # Fetch up to 30 posts
             title = temps[i].findAll('a')[0].text.strip()
             link = temps[i].find('a')['href']
             movie_list.append(title)
@@ -155,7 +175,6 @@ def get_movie_details(url):
             torrent_link = filelink[p] if p < len(filelink) else None
             if torrent_link and not torrent_link.startswith('http'):
                 torrent_link = f'{TAMILMV_URL}{torrent_link}'
-
             message = f"""
 <b>📂 Movie Title:</b>
 <blockquote>{movie_title}</blockquote>
@@ -169,13 +188,36 @@ def get_movie_details(url):
                 message += """
 📥 <b>Torrent File:</b> Not Available
 """
-
             movie_details.append(message)
 
         return movie_details
     except Exception as e:
         logger.error(f"Error retrieving movie details: {e}")
         return []
+
+
+def search_movie(query):
+    try:
+        search_url = f"{TAMILMV_URL}/index.php?/search/&q={query.replace(' ', '+')}"
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
+        response = requests.get(search_url, headers=headers, allow_redirects=True)
+        response.raise_for_status()
+
+        soup = BeautifulSoup(response.text, 'lxml')
+        
+        # Find the first search result link
+        result_link = soup.find('h4', class_='ipsDataItem_title').find('a')['href']
+
+        if result_link:
+            return get_movie_details(result_link)
+        else:
+            return None
+
+    except Exception as e:
+        logger.error(f"Error searching for movie: {e}")
+        return None
 
 
 @app.route('/')
