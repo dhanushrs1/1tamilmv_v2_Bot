@@ -19,7 +19,7 @@ load_dotenv()
 # ============ WOODctaft =================
 TOKEN = os.getenv('TOKEN')
 WEBHOOK_URL = os.getenv('WEBHOOK_URL')
-TAMILMV_URL = os.getenv('TAMILMV_URL', 'https://www.1tamilmv.boo')
+TAMILMV_URL = os.getenv('TAMILMV_URL', '')
 PORT = int(os.getenv('PORT', 3000))
 # ========================================
 bot = telebot.TeleBot(TOKEN, parse_mode='HTML')
@@ -159,9 +159,6 @@ def get_movie_details(url):
             message = f"""
 <b>📂 Movie Title:</b>
 <blockquote>{movie_title}</blockquote>
-
-🧲 <b>Magnet Link:</b>
-<pre>{mag[p]}</pre>
 """
             if torrent_link:
                 message += f"""
